@@ -1,0 +1,123 @@
+{
+  "entities": {
+    "Batch": {
+      "title": "Batch",
+      "description": "A group of students attending a specific class.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "timing": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "A student enrolled in the institute.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "batchId": { "type": "string" },
+        "totalFees": { "type": "number" },
+        "paidFees": { "type": "number" },
+        "joinedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "batchId", "totalFees"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Daily expenses of the institute.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "amount"]
+    },
+    "Teacher": {
+      "title": "Teacher",
+      "description": "Staff members or teachers.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "subject": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "Lead": {
+      "title": "Lead",
+      "description": "Potential students or inquiries.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "status": { "type": "string", "enum": ["open", "closed", "converted"] }
+      },
+      "required": ["name"]
+    },
+    "Attendance": {
+      "title": "Attendance",
+      "description": "Daily attendance records.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "date": { "type": "string", "format": "date" },
+        "status": { "type": "string", "enum": ["present", "absent", "late"] }
+      },
+      "required": ["studentId", "date", "status"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Fee payment records.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "method": { "type": "string", "enum": ["cash", "online", "check"] },
+        "remarks": { "type": "string" }
+      },
+      "required": ["studentId", "amount", "date", "method"]
+    }
+  },
+  "firestore": {
+    "/batches": {
+      "schema": "Batch",
+      "description": "Collection of batches."
+    },
+    "/students": {
+      "schema": "Student",
+      "description": "Collection of students."
+    },
+    "/expenses": {
+      "schema": "Expense",
+      "description": "Collection of expenses."
+    },
+    "/teachers": {
+      "schema": "Teacher",
+      "description": "Collection of teachers."
+    },
+    "/leads": {
+      "schema": "Lead",
+      "description": "Collection of leads."
+    },
+    "/attendance": {
+      "schema": "Attendance",
+      "description": "Collection of attendance records."
+    },
+    "/payments": {
+      "schema": "Payment",
+      "description": "Collection of fee payments."
+    }
+  }
+}
