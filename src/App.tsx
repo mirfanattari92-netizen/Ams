@@ -3,6 +3,8 @@ import {
   collection, 
   onSnapshot, 
   addDoc, 
+  updateDoc,
+  doc,
   serverTimestamp
 } from 'firebase/firestore';
 import { 
@@ -70,6 +72,7 @@ interface Student {
   totalFees: number;
   paidFees: number;
   joinedAt: any;
+  rollNo?: string;
 }
 
 interface Expense {
@@ -189,7 +192,9 @@ export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [showAddModal, setShowAddModal] = useState<'batch' | 'student' | 'expense' | 'attendance' | 'payment' | 'lead' | null>(null);
+  const [showAllStudents, setShowAllStudents] = useState(false);
+  const [showAddModal, setShowAddModal] = useState<'batch' | 'student' | 'expense' | 'attendance' | 'payment' | 'lead' | 'edit-student' | null>(null);
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -215,7 +220,7 @@ export default function App() {
 
   // Form States
   const [newBatch, setNewBatch] = useState({ name: '', timing: '' });
-  const [newStudent, setNewStudent] = useState({ name: '', phone: '', batchId: '', totalFees: 0, paidFees: 0 });
+  const [newStudent, setNewStudent] = useState({ name: '', phone: '', batchId: '', totalFees: 0, paidFees: 0, rollNo: '' });
   const [newExpense, setNewExpense] = useState({ title: '', amount: 0 });
   const [newPayment, setNewPayment] = useState({ amount: 0, method: 'cash' as const, remarks: '' });
   const [newLead, setNewLead] = useState({ name: '', phone: '', course: '' });
@@ -276,7 +281,7 @@ export default function App() {
         newNotifications.push({
           id: `fee-${s.id}`,
           title: 'Pending Fee',
-          message: `${s.name} has a pending balance of ₹${s.totalFees - s.paidFees}`,
+          message: `${s.name} has a pending balance of Rs. ${s.totalFees - s.paidFees}`,
           type: 'warning',
           date: new Date(),
           read: false
@@ -396,12 +401,34 @@ export default function App() {
   const handleAddStudent = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await addDoc(collection(db, 'students'), { ...newStudent, joinedAt: serverTimestamp() });
-      setNewStudent({ name: '', phone: '', batchId: '', totalFees: 0, paidFees: 0 });
+      await addDoc(collection(db, 'students'), { 
+        ...newStudent, 
+        joinedAt: serverTimestamp() 
+      });
+      setNewStudent({ name: '', phone: '', batchId: '', totalFees: 0, paidFees: 0, rollNo: '' });
       setShowAddModal(null);
       toast.success('Student added successfully');
     } catch (error) {
       toast.error('Failed to add student');
+    }
+  };
+
+  const handleUpdateStudent = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingStudent) return;
+    try {
+      await updateDoc(doc(db, 'students', editingStudent.id), {
+        name: editingStudent.name,
+        phone: editingStudent.phone,
+        batchId: editingStudent.batchId,
+        totalFees: Number(editingStudent.totalFees),
+        rollNo: editingStudent.rollNo || ''
+      });
+      toast.success('Student updated successfully');
+      setShowAddModal(null);
+      setEditingStudent(null);
+    } catch (error) {
+      toast.error('Failed to update student');
     }
   };
 
@@ -610,15 +637,15 @@ export default function App() {
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <p className="text-[10px] text-blue-200 uppercase tracking-wider">Income</p>
-                <p className="text-lg font-bold">₹{receivedIncome}</p>
+                <p className="text-lg font-bold">Rs. {receivedIncome}</p>
               </div>
               <div>
                 <p className="text-[10px] text-blue-200 uppercase tracking-wider">Expense</p>
-                <p className="text-lg font-bold">₹{todayExpense}</p>
+                <p className="text-lg font-bold">Rs. {todayExpense}</p>
               </div>
               <div>
                 <p className="text-[10px] text-blue-200 uppercase tracking-wider">Profit</p>
-                <p className="text-lg font-bold">₹{receivedIncome - todayExpense}</p>
+                <p className="text-lg font-bold">Rs. {receivedIncome - todayExpense}</p>
               </div>
             </div>
           </div>
@@ -630,15 +657,15 @@ export default function App() {
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <p className="text-[10px] text-blue-200 uppercase tracking-wider">Income</p>
-                <p className="text-lg font-bold">₹{receivedIncome}</p>
+                <p className="text-lg font-bold">Rs. {receivedIncome}</p>
               </div>
               <div>
                 <p className="text-[10px] text-blue-200 uppercase tracking-wider">Expense</p>
-                <p className="text-lg font-bold">₹{todayExpense}</p>
+                <p className="text-lg font-bold">Rs. {todayExpense}</p>
               </div>
               <div>
                 <p className="text-[10px] text-blue-200 uppercase tracking-wider">Profit</p>
-                <p className="text-lg font-bold">₹{receivedIncome - todayExpense}</p>
+                <p className="text-lg font-bold">Rs. {receivedIncome - todayExpense}</p>
               </div>
             </div>
           </div>
@@ -650,10 +677,17 @@ export default function App() {
         <h2 className="text-xl font-bold text-[#1E3A8A] mb-4">Overview</h2>
         <div className="grid grid-cols-3 gap-3">
           <StatCard icon={BookOpen} label="Total Batches" value={batches.length} color="text-blue-600" iconBg="bg-blue-50" />
-          <StatCard icon={Users} label="Total Students" value={students.length} color="text-green-600" iconBg="bg-green-50" />
+          <StatCard 
+            icon={Users} 
+            label="Total Students" 
+            value={students.length} 
+            color="text-green-600" 
+            iconBg="bg-green-50" 
+            onClick={() => setShowAllStudents(true)}
+          />
           <StatCard icon={Clock} label="Recently Joined" value={0} color="text-orange-600" iconBg="bg-orange-50" />
-          <StatCard icon={Wallet} label="Today's Collection" value={`₹${receivedIncome}`} color="text-emerald-600" iconBg="bg-emerald-50" />
-          <StatCard icon={TrendingUp} label="Today's Expense" value={`₹${todayExpense}`} color="text-rose-600" iconBg="bg-rose-50" />
+          <StatCard icon={Wallet} label="Today's Collection" value={`Rs. ${receivedIncome}`} color="text-emerald-600" iconBg="bg-emerald-50" />
+          <StatCard icon={TrendingUp} label="Today's Expense" value={`Rs. ${todayExpense}`} color="text-rose-600" iconBg="bg-rose-50" />
           <StatCard icon={ArrowUpRight} label="Open Leads" value={leads.filter(l => l.status === 'open').length} color="text-purple-600" iconBg="bg-purple-50" />
           <StatCard 
             icon={Bell} 
@@ -681,7 +715,9 @@ export default function App() {
           <div onClick={() => setShowAddModal('expense')}>
             <QuickAction icon={Plus} label="Add Expense" color="bg-rose-50" />
           </div>
-          <QuickAction icon={LayoutGrid} label="View All" color="bg-purple-50" />
+          <div onClick={() => setShowAllStudents(true)}>
+            <QuickAction icon={LayoutGrid} label="View All" color="bg-purple-50" />
+          </div>
         </div>
       </div>
 
@@ -690,6 +726,84 @@ export default function App() {
         <h2 className="text-6xl font-black text-gray-400">Fees</h2>
         <h2 className="text-6xl font-black text-gray-400 -mt-4">Management</h2>
         <p className="text-lg font-medium tracking-widest mt-2">Simple • Smart • Easy</p>
+      </div>
+    </main>
+  );
+
+  const renderAllStudents = () => (
+    <main className="p-4 space-y-4">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <button onClick={() => setShowAllStudents(false)} className="p-2 -ml-2">
+            <Plus className="w-5 h-5 rotate-45 text-gray-400" />
+          </button>
+          <h2 className="text-xl font-bold text-[#1E3A8A]">All Students ({students.length})</h2>
+        </div>
+        <button 
+          onClick={() => setShowAddModal('student')}
+          className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center shadow-lg"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
+      </div>
+
+      <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3">
+        <Search className="w-5 h-5 text-gray-400" />
+        <input 
+          type="text" 
+          placeholder="Search here..." 
+          className="flex-1 bg-transparent border-none focus:ring-0 text-sm"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+        />
+      </div>
+
+      <div className="flex items-center justify-between">
+        <select 
+          value={selectedBatchId}
+          onChange={e => setSelectedBatchId(e.target.value)}
+          className="bg-transparent border-none text-blue-900 font-bold text-sm focus:ring-0 p-0"
+        >
+          <option value="all">All Batches</option>
+          {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+      </div>
+
+      <div className="space-y-3">
+        {students
+          .filter(s => (selectedBatchId === 'all' || s.batchId === selectedBatchId))
+          .filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
+          .map(student => (
+            <div 
+              key={student.id} 
+              onClick={() => {
+                setSelectedStudentId(student.id);
+                setShowAllStudents(false);
+              }}
+              className="bg-white p-4 rounded-2xl shadow-sm border border-gray-50 flex items-center justify-between active:scale-[0.98] transition-transform"
+            >
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center">
+                  <Users className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900">{student.name}</h3>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Roll No : {student.rollNo || 'N/A'}</p>
+                </div>
+              </div>
+              <div>
+                {student.totalFees - student.paidFees > 0 ? (
+                  <span className="px-3 py-1 bg-red-50 text-red-600 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                    Due : Rs. {student.totalFees - student.paidFees}
+                  </span>
+                ) : (
+                  <span className="px-3 py-1 bg-green-50 text-green-600 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" /> Paid
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
       </div>
     </main>
   );
@@ -836,14 +950,18 @@ export default function App() {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-50">
-          <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Total Collection</p>
-          <p className="text-xl font-bold text-green-600">₹{receivedIncome}</p>
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-50">
+          <p className="text-[8px] text-gray-400 uppercase font-bold mb-1">Collection</p>
+          <p className="text-sm font-bold text-green-600">Rs. {receivedIncome}</p>
         </div>
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-50">
-          <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Total Expenses</p>
-          <p className="text-xl font-bold text-red-600">₹{todayExpense}</p>
+        <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-50">
+          <p className="text-[8px] text-gray-400 uppercase font-bold mb-1">Expenses</p>
+          <p className="text-sm font-bold text-red-600">Rs. {todayExpense}</p>
+        </div>
+        <div className="bg-white p-3 rounded-2xl shadow-sm border border-gray-50">
+          <p className="text-[8px] text-gray-400 uppercase font-bold mb-1">Outstanding</p>
+          <p className="text-sm font-bold text-orange-600">Rs. {students.reduce((acc, s) => acc + (s.totalFees - s.paidFees), 0)}</p>
         </div>
       </div>
 
@@ -874,9 +992,9 @@ export default function App() {
                 </button>
               </div>
               <div className="text-right">
-                <p className="font-bold text-gray-900">₹{s.paidFees} <span className="text-gray-300 font-normal">/ ₹{s.totalFees}</span></p>
+                <p className="font-bold text-gray-900">Rs. {s.paidFees} <span className="text-gray-300 font-normal">/ Rs. {s.totalFees}</span></p>
                 <p className={cn("text-[10px] font-bold", s.paidFees === s.totalFees ? "text-green-600" : "text-red-600")}>
-                  {s.paidFees === s.totalFees ? 'Paid' : `Due: ₹${s.totalFees - s.paidFees}`}
+                  {s.paidFees === s.totalFees ? 'Paid' : `Due: Rs. ${s.totalFees - s.paidFees}`}
                 </p>
               </div>
             </div>
@@ -899,7 +1017,7 @@ export default function App() {
                   <p className="text-gray-400">{p.date?.toDate ? format(p.date.toDate(), 'dd MMM, hh:mm a') : 'Just now'}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold text-green-600">₹{p.amount}</p>
+                  <p className="font-bold text-green-600">Rs. {p.amount}</p>
                   <button 
                     onClick={() => setShowReceipt(p)}
                     className="text-blue-600 font-bold text-[10px]"
@@ -931,7 +1049,7 @@ export default function App() {
           <Bell className="w-5 h-5 text-yellow-600 mt-0.5" />
           <div>
             <p className="text-sm font-bold text-yellow-800">{pendingStudents.length} Students Pending</p>
-            <p className="text-xs text-yellow-700">Total outstanding: ₹{students.reduce((acc, s) => acc + (s.totalFees - s.paidFees), 0)}</p>
+            <p className="text-xs text-yellow-700">Total outstanding: Rs. {students.reduce((acc, s) => acc + (s.totalFees - s.paidFees), 0)}</p>
           </div>
         </div>
 
@@ -951,8 +1069,8 @@ export default function App() {
                   <p className="text-[10px] text-gray-500">{batches.find(b => b.id === student.batchId)?.name}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-red-600">Due: ₹{student.totalFees - student.paidFees}</p>
-                  <p className="text-[10px] text-gray-400">Total: ₹{student.totalFees}</p>
+                  <p className="text-sm font-bold text-red-600">Due: Rs. {student.totalFees - student.paidFees}</p>
+                  <p className="text-[10px] text-gray-400">Total: Rs. {student.totalFees}</p>
                 </div>
               </div>
               <div className="flex gap-2">
@@ -965,7 +1083,7 @@ export default function App() {
                 </a>
                 <button 
                   onClick={() => {
-                    const text = `Hi ${student.name}, this is a reminder regarding your pending fees of ₹${student.totalFees - student.paidFees} at our institute. Please clear it at your earliest convenience. Thank you!`;
+                    const text = `Hi ${student.name}, this is a reminder regarding your pending fees of Rs. ${student.totalFees - student.paidFees} at our institute. Please clear it at your earliest convenience. Thank you!`;
                     window.open(`https://wa.me/${student.phone}?text=${encodeURIComponent(text)}`, '_blank');
                   }}
                   className="flex-1 bg-green-600 text-white py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2"
@@ -1073,93 +1191,166 @@ export default function App() {
     const attendanceRate = studentAttendance.length > 0 
       ? Math.round((presentCount / studentAttendance.length) * 100) 
       : 0;
+    const dueAmount = student.totalFees - student.paidFees;
 
     return (
       <main className="p-4 space-y-6">
-        <div className="flex items-center gap-2">
-          <button onClick={() => setSelectedStudentId(null)} className="p-2 -ml-2">
-            <Plus className="w-5 h-5 rotate-45 text-gray-400" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button onClick={() => setSelectedStudentId(null)} className="p-2 -ml-2">
+              <Plus className="w-5 h-5 rotate-45 text-gray-400" />
+            </button>
+            <h2 className="text-xl font-bold text-[#1E3A8A]">{student.name} 's Profile</h2>
+          </div>
+          <button className="p-2">
+            <Settings className="w-5 h-5 text-gray-400" />
           </button>
-          <h2 className="text-xl font-bold text-[#1E3A8A]">Student Profile</h2>
         </div>
 
-        {/* Profile Header */}
-        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-50 flex flex-col items-center text-center">
-          <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mb-4">
-            <span className="text-2xl font-black text-blue-600">{student.name.charAt(0)}</span>
+        {/* Profile Card */}
+        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-50 relative overflow-hidden">
+          <div className="flex items-start justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center">
+                <Users className="w-8 h-8 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">{student.name}</h3>
+                <div className="flex flex-col gap-1 mt-1">
+                  <div className="flex items-center gap-1 text-gray-400">
+                    <Phone className="w-3 h-3" />
+                    <span className="text-xs font-medium">{student.phone || 'N/A'}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-blue-600">
+                    <GraduationCap className="w-3 h-3" />
+                    <span className="text-[10px] font-bold uppercase tracking-wider">Roll No: {student.rollNo || 'N/A'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <button className="text-gray-400">
+              <Plus className="w-5 h-5 rotate-90" />
+            </button>
           </div>
-          <h3 className="text-xl font-bold text-gray-900">{student.name}</h3>
-          <p className="text-sm text-gray-500 mb-4">{batches.find(b => b.id === student.batchId)?.name}</p>
-          <div className="flex gap-3 w-full">
-            <a href={`tel:${student.phone}`} className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2">
-              <Phone className="w-4 h-4" /> Call
-            </a>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-blue-50/50 p-3 rounded-2xl text-center">
+              <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-blue-600 uppercase mb-1">
+                <Wallet className="w-3 h-3" /> Total
+              </div>
+              <p className="text-sm font-black text-blue-900">Rs. {student.totalFees}</p>
+            </div>
+            <div className="bg-green-50/50 p-3 rounded-2xl text-center">
+              <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-green-600 uppercase mb-1">
+                <CheckCircle2 className="w-3 h-3" /> Paid
+              </div>
+              <p className="text-sm font-black text-green-900">Rs. {student.paidFees}</p>
+            </div>
+            <div className="bg-red-50/50 p-3 rounded-2xl text-center">
+              <div className="flex items-center justify-center gap-1 text-[10px] font-bold text-red-600 uppercase mb-1">
+                <Bell className="w-3 h-3" /> Due
+              </div>
+              <p className="text-sm font-black text-red-900">Rs. {dueAmount}</p>
+            </div>
+          </div>
+
+          {dueAmount > 0 && (
+            <div className="mt-6 bg-red-50 p-4 rounded-2xl flex items-center justify-between border border-red-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-red-500 shadow-sm">
+                  <Bell className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-red-400 uppercase tracking-wider">Fee Due Reminder</p>
+                  <p className="text-xs font-bold text-red-900">Rs. {dueAmount} due for {format(new Date(), 'MMMM yyyy')}</p>
+                  <p className="text-[10px] text-red-400 mt-0.5">Tap to share reminder</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => {
+                  const text = `Hi ${student.name}, this is a reminder regarding your pending fees of Rs. ${dueAmount} for ${format(new Date(), 'MMMM yyyy')}. Please clear it at your earliest convenience. Thank you!`;
+                  window.open(`https://wa.me/${student.phone}?text=${encodeURIComponent(text)}`, '_blank');
+                }}
+                className="p-2 text-red-400"
+              >
+                <ArrowUpRight className="w-5 h-5" />
+              </button>
+            </div>
+          )}
+
+          <div className="mt-6 flex items-center justify-between text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+            <span>Batch: {batches.find(b => b.id === student.batchId)?.name}</span>
+            <span>Joined on {student.joinedAt?.toDate ? format(student.joinedAt.toDate(), 'dd MMM yyyy') : 'N/A'}</span>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="grid grid-cols-4 gap-3">
+          <button 
+            onClick={() => {
+              setEditingStudent(student);
+              setShowAddModal('edit-student');
+            }}
+            className="bg-white p-4 rounded-2xl shadow-sm border border-gray-50 flex flex-col items-center gap-2 active:scale-95 transition-transform"
+          >
+            <Plus className="w-5 h-5 text-blue-600" />
+            <span className="text-[10px] font-bold text-gray-500 uppercase">Edit</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('attendance')}
+            className="bg-white p-4 rounded-2xl shadow-sm border border-gray-50 flex flex-col items-center gap-2 active:scale-95 transition-transform"
+          >
+            <UserCheck className="w-5 h-5 text-green-600" />
+            <span className="text-[10px] font-bold text-gray-500 uppercase">Attendance</span>
+          </button>
+          <button 
+            onClick={() => setActiveTab('reports')}
+            className="bg-white p-4 rounded-2xl shadow-sm border border-gray-50 flex flex-col items-center gap-2 active:scale-95 transition-transform"
+          >
+            <TrendingUp className="w-5 h-5 text-orange-600" />
+            <span className="text-[10px] font-bold text-gray-500 uppercase">report</span>
+          </button>
+          <button className="bg-white p-4 rounded-2xl shadow-sm border border-gray-50 flex flex-col items-center gap-2 active:scale-95 transition-transform">
+            <LayoutGrid className="w-5 h-5 text-purple-600" />
+            <span className="text-[10px] font-bold text-gray-500 uppercase">more</span>
+          </button>
+        </div>
+
+        {/* Fees History */}
+        <div className="bg-white rounded-3xl shadow-sm border border-gray-50 overflow-hidden">
+          <div className="p-5 border-b border-gray-50 flex items-center justify-between">
+            <h3 className="text-lg font-bold text-gray-900">Student Fees History</h3>
             <button 
               onClick={() => {
                 setSelectedStudentForPayment(student);
                 setShowAddModal('payment');
               }}
-              className="flex-1 bg-emerald-600 text-white py-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2"
+              className="w-8 h-8 bg-blue-600 text-white rounded-lg flex items-center justify-center"
             >
-              <Plus className="w-4 h-4" /> Collect Fee
+              <Plus className="w-5 h-5" />
             </button>
           </div>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-50">
-            <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Attendance</p>
-            <p className="text-xl font-bold text-blue-600">{attendanceRate}%</p>
-            <p className="text-[10px] text-gray-400">{presentCount} / {studentAttendance.length} days</p>
-          </div>
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-50">
-            <p className="text-[10px] text-gray-400 uppercase font-bold mb-1">Fee Status</p>
-            <p className={cn("text-xl font-bold", student.paidFees === student.totalFees ? "text-green-600" : "text-red-600")}>
-              ₹{student.totalFees - student.paidFees}
-            </p>
-            <p className="text-[10px] text-gray-400">Due Amount</p>
-          </div>
-        </div>
-
-        {/* Payment History */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-50 overflow-hidden">
-          <div className="p-4 bg-gray-50 border-b border-gray-100">
-            <h3 className="font-bold text-gray-900">Payment History</h3>
-          </div>
-          <div className="p-4 space-y-4">
+          <div className="p-5 space-y-4">
             {studentPayments.length === 0 ? (
-              <p className="text-center py-4 text-gray-400 text-xs">No payments found</p>
-            ) : studentPayments.sort((a, b) => b.date?.seconds - a.date?.seconds).map(p => (
-              <div key={p.id} className="flex items-center justify-between text-sm border-b border-gray-50 pb-3 last:border-0 last:pb-0">
-                <div>
-                  <p className="font-bold text-gray-800">₹{p.amount}</p>
-                  <p className="text-[10px] text-gray-400">{p.date?.toDate ? format(p.date.toDate(), 'dd MMM yyyy') : 'Just now'}</p>
+              <p className="text-center py-10 text-gray-400 text-xs">No payment history found</p>
+            ) : studentPayments.sort((a, b) => b.date?.seconds - a.date?.seconds).map((p, index) => (
+              <div key={p.id} className="bg-gray-50/50 p-4 rounded-2xl flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-sm">
+                    {studentPayments.length - index}
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-gray-900">
+                      {p.date?.toDate ? format(p.date.toDate(), 'dd MMM yyyy') : 'Just now'}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="px-2 py-1 bg-blue-50 text-blue-600 rounded text-[10px] font-bold uppercase">{p.method}</span>
-                  <button onClick={() => setShowReceipt(p)} className="block text-blue-600 text-[10px] font-bold mt-1">Receipt</button>
+                <div className="flex items-center gap-4">
+                  <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center">
+                    <QrCode className="w-4 h-4" />
+                  </div>
+                  <p className="font-black text-green-600">Rs. {p.amount}</p>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Attendance Log */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-50 overflow-hidden">
-          <div className="p-4 bg-gray-50 border-b border-gray-100">
-            <h3 className="font-bold text-gray-900">Attendance Log</h3>
-          </div>
-          <div className="p-4 grid grid-cols-7 gap-2">
-            {studentAttendance.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 14).map(a => (
-              <div key={a.id} className="flex flex-col items-center gap-1">
-                <div className={cn(
-                  "w-8 h-8 rounded-lg flex items-center justify-center",
-                  a.status === 'present' ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
-                )}>
-                  {a.status === 'present' ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
-                </div>
-                <span className="text-[8px] text-gray-400 font-bold">{format(new Date(a.date), 'dd/MM')}</span>
               </div>
             ))}
           </div>
@@ -1200,7 +1391,7 @@ export default function App() {
 
       <AnimatePresence mode="wait">
         <motion.div
-          key={selectedStudentId || activeTab}
+          key={selectedStudentId || showAllStudents || activeTab}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
@@ -1208,13 +1399,17 @@ export default function App() {
         >
           {selectedStudentId ? renderStudentProfile() : (
             <>
-              {activeTab === 'dashboard' && renderDashboard()}
-              {activeTab === 'batches' && renderBatches()}
-              {activeTab === 'attendance' && renderAttendance()}
-              {activeTab === 'leads' && renderLeads()}
-              {activeTab === 'reports' && renderReports()}
-              {activeTab === 'reminders' && renderReminders()}
-              {activeTab === 'settings' && renderSettings()}
+              {showAllStudents ? renderAllStudents() : (
+                <>
+                  {activeTab === 'dashboard' && renderDashboard()}
+                  {activeTab === 'batches' && renderBatches()}
+                  {activeTab === 'attendance' && renderAttendance()}
+                  {activeTab === 'leads' && renderLeads()}
+                  {activeTab === 'reports' && renderReports()}
+                  {activeTab === 'reminders' && renderReminders()}
+                  {activeTab === 'settings' && renderSettings()}
+                </>
+              )}
             </>
           )}
         </motion.div>
@@ -1382,6 +1577,13 @@ export default function App() {
                   value={newStudent.phone}
                   onChange={e => setNewStudent({...newStudent, phone: e.target.value})}
                 />
+                <input 
+                  type="text" 
+                  placeholder="Roll No" 
+                  className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-600"
+                  value={newStudent.rollNo}
+                  onChange={e => setNewStudent({...newStudent, rollNo: e.target.value})}
+                />
                 <select 
                   className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-600"
                   value={newStudent.batchId}
@@ -1391,28 +1593,69 @@ export default function App() {
                   <option value="">Select Batch</option>
                   {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                 </select>
-                <div className="grid grid-cols-2 gap-4">
-                  <input 
-                    type="number" 
-                    placeholder="Total Fees" 
-                    className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-600"
-                    value={newStudent.totalFees}
-                    onChange={e => setNewStudent({...newStudent, totalFees: Number(e.target.value)})}
-                    required
-                  />
-                  <input 
-                    type="number" 
-                    placeholder="Paid Fees" 
-                    className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-600"
-                    value={newStudent.paidFees}
-                    onChange={e => setNewStudent({...newStudent, paidFees: Number(e.target.value)})}
-                    required
-                  />
-                </div>
-                <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold">Save Student</button>
+                <input 
+                  type="number" 
+                  placeholder="Total Fees" 
+                  className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-600"
+                  value={newStudent.totalFees || ''}
+                  onChange={e => setNewStudent({...newStudent, totalFees: Number(e.target.value)})}
+                  required
+                />
+                <input 
+                  type="number" 
+                  placeholder="Initial Paid Fees" 
+                  className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-600"
+                  value={newStudent.paidFees || ''}
+                  onChange={e => setNewStudent({...newStudent, paidFees: Number(e.target.value)})}
+                />
+                <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold">Add Student</button>
               </form>
             )}
 
+            {showAddModal === 'edit-student' && editingStudent && (
+              <form onSubmit={handleUpdateStudent} className="space-y-4">
+                <input 
+                  type="text" 
+                  placeholder="Student Name" 
+                  className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-600"
+                  value={editingStudent.name}
+                  onChange={e => setEditingStudent({...editingStudent, name: e.target.value})}
+                  required
+                />
+                <input 
+                  type="tel" 
+                  placeholder="Phone Number" 
+                  className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-600"
+                  value={editingStudent.phone}
+                  onChange={e => setEditingStudent({...editingStudent, phone: e.target.value})}
+                />
+                <input 
+                  type="text" 
+                  placeholder="Roll No" 
+                  className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-600"
+                  value={editingStudent.rollNo}
+                  onChange={e => setEditingStudent({...editingStudent, rollNo: e.target.value})}
+                />
+                <select 
+                  className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-600"
+                  value={editingStudent.batchId}
+                  onChange={e => setEditingStudent({...editingStudent, batchId: e.target.value})}
+                  required
+                >
+                  <option value="">Select Batch</option>
+                  {batches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+                <input 
+                  type="number" 
+                  placeholder="Total Fees" 
+                  className="w-full p-4 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-blue-600"
+                  value={editingStudent.totalFees || ''}
+                  onChange={e => setEditingStudent({...editingStudent, totalFees: Number(e.target.value)})}
+                  required
+                />
+                <button type="submit" className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold">Update Student</button>
+              </form>
+            )}
             {showAddModal === 'expense' && (
               <form onSubmit={handleAddExpense} className="space-y-4">
                 <input 
@@ -1470,7 +1713,7 @@ export default function App() {
                 <div className="p-4 bg-blue-50 rounded-xl">
                   <p className="text-xs text-blue-600 font-bold uppercase">Collecting for</p>
                   <p className="font-bold text-blue-900">{selectedStudentForPayment.name}</p>
-                  <p className="text-xs text-blue-700">Due Amount: ₹{selectedStudentForPayment.totalFees - selectedStudentForPayment.paidFees}</p>
+                  <p className="text-xs text-blue-700">Due Amount: Rs. {selectedStudentForPayment.totalFees - selectedStudentForPayment.paidFees}</p>
                 </div>
                 <input 
                   type="number" 
@@ -1536,7 +1779,7 @@ export default function App() {
               </div>
               <div className="flex justify-between text-lg pt-2">
                 <span className="font-bold text-gray-900">Amount Paid</span>
-                <span className="font-black text-blue-600">₹{showReceipt.amount}</span>
+                <span className="font-black text-blue-600">Rs. {showReceipt.amount}</span>
               </div>
             </div>
 
