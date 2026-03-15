@@ -5,6 +5,7 @@ import { google } from "googleapis";
 import session from "express-session";
 import cookieParser from "cookie-parser";
 import dotenv from "dotenv";
+import twilio from "twilio";
 
 dotenv.config();
 
@@ -111,6 +112,36 @@ app.post("/api/backup/google-drive", async (req, res) => {
   } catch (error) {
     console.error("Backup Error:", error);
     res.status(500).json({ error: "Backup failed" });
+  }
+});
+
+// SMS Route
+app.post("/api/send-sms", async (req, res) => {
+  const { to, message } = req.body;
+
+  if (!to || !message) {
+    return res.status(400).json({ error: "Phone number and message are required" });
+  }
+
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const from = process.env.TWILIO_PHONE_NUMBER;
+
+  if (!accountSid || !authToken || !from) {
+    return res.status(500).json({ error: "Twilio credentials not configured" });
+  }
+
+  try {
+    const client = twilio(accountSid, authToken);
+    const result = await client.messages.create({
+      body: message,
+      from: from,
+      to: to
+    });
+    res.json({ success: true, messageId: result.sid });
+  } catch (error: any) {
+    console.error("SMS Error:", error);
+    res.status(500).json({ error: error.message || "Failed to send SMS" });
   }
 });
 

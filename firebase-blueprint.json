@@ -88,6 +88,24 @@
         "remarks": { "type": "string" }
       },
       "required": ["studentId", "amount", "date", "method"]
+    },
+    "Institute": {
+      "title": "Institute",
+      "description": "Institute profile and settings.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "address": { "type": "string" },
+        "email": { "type": "string" },
+        "website": { "type": "string" },
+        "contactNo": { "type": "string" },
+        "description": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "principalName": { "type": "string" },
+        "registrationNo": { "type": "string" }
+      },
+      "required": ["name", "contactNo"]
     }
   },
   "firestore": {
@@ -118,6 +136,10 @@
     "/payments": {
       "schema": "Payment",
       "description": "Collection of fee payments."
+    },
+    "/institute": {
+      "schema": "Institute",
+      "description": "Collection for institute settings."
     }
   }
 }
